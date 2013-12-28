@@ -1,0 +1,9 @@
+name = SBOC Link Distributor
+description = Manage access to download links
+package = SBOC Link Distributor
+core = 7.x
+configure = admin/config/system/sboc_link_distributor
+;include Eventbrite class file
+;dependencies - other projects that are required to make this one work
+dependencies[] = eventbrite_sboc
+version = '7.x-1.1-dev'

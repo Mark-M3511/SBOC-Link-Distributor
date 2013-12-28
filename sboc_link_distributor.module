@@ -1,0 +1,329 @@
+<?php
+/**
+ * @file
+ * sboc_link_distributor.module - manage url distribution
+ */
+ 
+ /**
+ * Implementation of hook_help
+ */
+  
+ function sboc_link_distributor_help($path, $arg) {
+    $output = '';
+	switch($path){
+		case 'admin/help#sboc_link_distributor':
+		  $output = '<p>'. t('Displays a form which accepts an order id. User entered data is matched against entries in the database and an approproate link or links displayed.').'</p>';
+		  break;		
+		default:
+          break;		
+	}
+    return $output;
+ }
+ 
+ /**
+ * Implementation of hook_permission
+ */
+ function sboc_link_distributor_permission() {
+    $result = array(
+	  'administer sboc_link_distributor' => array(
+	     'title' => t('Configure SBOC Link Distributor Module'),
+		 'description' => t('Allows authorized users to configure this module'),
+	   ),
+	   'access sboc_link_distributor form' => array(
+	      'title' => t('Access data entry form'),
+	      'desscription' => t('Allows access to form'),
+	   ),
+	);
+	return $result;
+ }
+  
+ /**
+ * Implementation of hook_menu
+ */
+ function sboc_link_distributor_menu(){ 
+    // Custom router items
+	
+	$items = array();
+	
+	$items['admin/config/system/sboc_link_distributor'] = array(
+	  'title' => t('SBOC Link Request'),
+	  'description' => t('Manage SBOC link requests'),
+	  'page callback' => 'drupal_get_form',
+      'page arguments' => array('_sboc_link_distributor_link_list'),
+	  'access arguments' => array('access sboc_link_distributor form'),
+	);
+	
+	$items['admin/config/system/sboc_link_distributor/main'] = array(
+	   'title' => 'Configure SBOC Link Distributor',
+       'type' => MENU_DEFAULT_LOCAL_TASK,
+	);
+	
+	$items['admin/config/system/sboc_link_distributor/add'] = array(
+		'title' => 'Add link',
+		'type' =>  MENU_LOCAL_ACTION,
+		'description' => 'Add download links',		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_sboc_link_distributor_link_add'),
+		'access arguments' => array('administer sboc_link_distributor'),
+// 		'file' => 'sboc_link_distributor_admin_form.inc',
+// 	    'file path' => drupal_get_path('module', 'sboc_link_distributor'). '/includes',	
+		'weight' => 10,
+	);
+	
+	$items['admin/config/system/sboc_link_distributor/category/%/edit'] = array(
+		'title' => 'Edit link',
+		'type' =>  MENU_NORMAL_ITEM | MENU_CALLBACK,
+		'description' => 'Edit download links',		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_sboc_link_distributor_link_edit'),
+		'access arguments' => array('administer sboc_link_distributor'),
+// 		'file' => 'sboc_link_distributor_admin_form.inc',
+// 	    'file path' => drupal_get_path('module', 'sboc_link_distributor'). '/includes',	
+// 		'weight' => 20,
+	);
+	
+	return $items;
+ }
+ 
+ function _sboc_link_distributor_link_list($form, &$form_state)
+ {
+    $form = array();  
+    $destination = drupal_get_destination();
+     
+    $header = array(
+      'category' => array('data' => t('Category'), 'field' => 's.category'),
+      'event_id' => array('data' => t('Event Id'), 'field' => 's.event_id'),      
+      'url' => t('Link Url'),
+      'operations' => array('data' => t('Operations')),
+    ); 
+    
+    $query = db_select('sboc_links_per_category', 's')->extend('PagerDefault')->extend('TableSort');
+    $categories = $query->fields('s')
+    ->limit(20)
+    ->orderByHeader($header)
+    ->addTag('category_links')
+    ->execute();
+	
+	$options = array();
+	
+	while($category = $categories->fetchAssoc()){
+	   	$options[$category['category']] = array(
+	   		'category' => array(
+	   			'data' => array(
+	   				'#type' => 'link',
+	   				'#title' => $category['category'],
+	   				'#href' =>  $category['lpcid'],	   				
+	   			),
+	   		),
+	   		'event_id' => check_plain($category['event_id']),
+	   		'url' => check_plain($category['url']),   		
+	   	);	
+	   	$options[$category['category']]['operations'] = array();
+	   	$operations['edit'] = array(
+        	'title' => t('edit'),
+        	'href' => 'admin/config/system/sboc_link_distributor/category/' . $category['lpcid'] . '/edit',
+        	'query' => $destination,
+      	); 
+      	$operations['delete'] = array(
+        	'title' => t('delete'),
+        	'href' => 'admin/config/system/sboc_link_distributor/category/' . $category['lpcid'] . '/delete',
+        	'query' => $destination,
+      	);
+      	$options[$category['category']]['operations'] =  array(
+        	'data' => array(
+          		'#theme' => 'links__node_operations',
+          		'#links' => $operations,
+         		'#attributes' => array('class' => array('links', 'inline')),
+       		 ),
+        );
+	}
+	
+	$form['categories'] = array(
+      '#type' => 'tableselect',
+      '#header' => $header,
+      '#options' => $options,
+      '#empty' => t('No content available.'),
+    );
+     
+    return $form;
+ }
+ 
+ function _sboc_link_distributor_link_add($form, &$form_state)
+ {
+    $form = array();
+     
+    $form['sboc_link_distributor_link_add'] = array(
+	   '#type' => 'fieldset',
+	   '#title' => t('Add Link'),
+	); 
+	
+	$categories = drupal_map_assoc(array('P', 'J', 'I'), '_sboc_link_distributor_categories');
+	$form['sboc_link_distributor_link_add']['category'] = array(
+	   '#type' => 'select',
+	   '#title' => t('Category:'),
+	   '#default_value' => 'P',
+	   '#options' => $categories,
+	   '#description' => t('Select category'),
+	);
+	
+	$form['sboc_link_distributor_link_add']['event_id'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Event Id:'),
+	   '#default_value' => '',
+	   '#size' => 60,
+  	   '#maxlength' => 128, 
+	   '#required' => TRUE,
+	);
+	
+	$form['sboc_link_distributor_link_add']['link'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Link Url:'),
+	   '#default_value' => '',
+	   '#size' => 100,
+  	   '#maxlength' => 255, 
+	   '#required' => TRUE,
+	);
+	
+	$form['sboc_link_distributor_link_add']['save'] = array(
+	   '#type' => 'submit',
+	   '#submit' => array('_sboc_link_distributor_submit_new',),
+	   '#value' => t('Save'),	  
+	);
+	
+	$form['sboc_link_distributor_link_add']['cancel'] = array(
+	   '#type' => 'submit',
+	   '#limit_validation_errors' => array(),
+	   '#submit' => array('_sboc_link_distributor_link_cancel_changes',),
+	   '#value' => t('Cancel'),	
+	);
+     
+    return $form;
+ }
+ 
+ function _sboc_link_distributor_categories($item)
+ {
+ 	switch($item)
+ 	{
+ 		case 'P':
+ 			$retVal = 'Primary';
+ 			break;
+ 		case 'J':
+ 			$retVal = 'Junior';
+ 			break;
+ 		case 'I':
+ 			$retVal = 'Intermediate';
+ 			break;
+ 		default:
+ 			break;			
+ 	}
+ 	return $retVal;
+ }
+ 
+ function _sboc_link_distributor_submit_new($form, &$form_state)
+ {
+ 	$lpcid = db_insert('sboc_links_per_category') // Table name no longer needs {}
+				->fields(array(
+  					'event_id' => $form_state['values']['event_id'],
+  					'category' => $form_state['values']['category'],
+  					'url' => $form_state['values']['link'],
+//   					'comment' => $form_state['values']['link'],
+				))
+	->execute();
+	
+	$form_state['redirect'] = 'admin/config/system/sboc_link_distributor/main';
+	
+	return $form;
+ }
+ 
+ function _sboc_link_distributor_link_edit($form, &$form_state)
+ {
+    $form = array();
+    
+    $query = db_select('sboc_links_per_category', 's')
+    ->fields('s')
+    ->condition('s.lpcid', (int)arg(5), '=')
+    ->range(0,1);
+//     $sql = $query->__toString();
+    $categories = $query->execute()->fetchAssoc();
+//     print_r($categories);
+     
+    $form['sboc_link_distributor_link_edit'] = array(
+	   '#type' => 'fieldset',
+	   '#title' => t('Edit Link'),
+	); 
+
+	$form['sboc_link_distributor_link_edit']['lpcid'] = array(
+	   '#type' => 'hidden',
+	   '#value' => (int)arg(5),
+	);
+	
+	$categories_pick_list = drupal_map_assoc(array('P', 'J', 'I'), '_sboc_link_distributor_categories');
+	$form['sboc_link_distributor_link_edit']['category'] = array(
+	   '#type' => 'select',
+	   '#title' => t('Category:'),
+	   '#default_value' => (!empty($form_state['values']['category']) ? $form_state['values']['category'] : check_plain($categories['category'])),
+	   '#options' => $categories_pick_list,
+	   '#description' => t('Select category'),
+	);
+	
+	$form['sboc_link_distributor_link_edit']['event_id'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Event Id:'),
+	   '#default_value' => (!empty($form_state['values']['event_id']) ? $form_state['values']['event_id'] : check_plain($categories['event_id'])),
+	   '#size' => 60,
+  	   '#maxlength' => 128, 
+	   '#required' => TRUE,
+	);
+	
+	$form['sboc_link_distributor_link_edit']['url'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Link Url:'),
+	   '#default_value' => (!empty($form_state['values']['url']) ? $form_state['values']['url'] : check_plain($categories['url'])),
+	   '#size' => 100,
+  	   '#maxlength' => 255, 
+	   '#required' => TRUE,
+	);
+	
+	$form['sboc_link_distributor_link_edit']['save'] = array(
+	   '#type' => 'submit',
+	   '#value' => t('Save'),	
+	   '#submit' => array('_sboc_link_distributor_link_submit_changes',),	
+	);
+	
+	$form['sboc_link_distributor_link_edit']['cancel'] = array(
+	   '#type' => 'submit',
+	   '#limit_validation_errors' => array(),
+	   '#submit' => array('_sboc_link_distributor_link_cancel_changes'),
+	   '#value' => t('Cancel'),	
+	);
+     
+    return $form;
+ }
+ 
+ function _sboc_link_distributor_link_submit_changes($form, &$form_state)
+ {
+ 	$query = db_update('sboc_links_per_category')
+ 		->fields(array(
+    		'event_id' => $form_state['values']['event_id'],
+  			'category' => $form_state['values']['category'],
+  			'url' => $form_state['values']['url'],
+//   		'comment' => $form_state['values']['link'],
+  	))
+  	->condition('lpcid', (int)$form_state['values']['lpcid'], '=')
+  	->execute();
+// 	print_r($form_state['values']);
+  	
+ 	return $form;
+ }
+ 
+ function _sboc_link_distributor_link_cancel_changes($form, &$form_state)
+ {
+ 	unset($form_state['storage']);
+  	$form_state['redirect'] = 'admin/config/system/sboc_link_distributor/main';
+ }
+ 
+  // -------------------------------------bof: hooks ---------------------------------------------- //
+ 
+
+ 
+ // -------------------------------------eof: hooks ---------------------------------------------- //

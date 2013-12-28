@@ -1,0 +1,121 @@
+<?php
+
+/**
+ * @file
+ *  SBOC Link Distributor install/uninstall routines.
+ */
+
+function sboc_link_distributor_schema(){
+  $schema['sboc_link_distribution'] = array(
+     'description' => 'Stores a record of links requested and authorized',
+	 'fields' => array(
+	    'ldid' => array(
+		   'description' => 'The primary identifier for records in this table.', 
+           'type' => 'serial', 
+           'unsigned' => TRUE, 
+           'not null' => TRUE,
+		),
+		'event_id' => array(
+		   'description' => 'The primary identifier for an Eventbrite event.', 
+           'type' => 'varchar', 
+           'length' => 20, 
+           'not null' => TRUE,
+		),
+		'attendee_id' => array(
+		   'description' => 'Eventbrite unique identifier per attendee.', 
+           'type' => 'int', 
+           'unsigned' => TRUE, 
+           'not null' => TRUE,
+		),
+		'order_id' => array(
+		   'description' => 'Eventbrite unique identifier per order.', 
+           'type' => 'int', 
+           'unsigned' => TRUE, 
+           'not null' => TRUE,
+		),
+		'create_date' => array(
+		   'description' => 'Date and time attendee record was created in this table.',          
+           'type' => 'datetime',
+           'mysql_type' => 'DATETIME',
+           'pgsql_type' => 'timestamp without time zone', 
+           'sqlite_type' => 'VARCHAR', 
+           'sqlsrv_type' => 'smalldatetime',		   
+           'not null' => TRUE,
+		),	
+		'email_address' => array(
+		   'description' => 'Email address of attendee.', 
+           'type' => 'varchar',  
+           'length' => 100,        
+           'not null' => TRUE,
+		),
+		'category' => array(
+		   'description' => 'Category attendee will compete in',            
+           'type' => 'varchar', 
+           'length' => 2,      		   
+           'not null' => TRUE,
+		),
+		'url' => array(
+		   'description' => 'Url for download',
+		   'type' => 'varchar',
+		   'length' => 255,
+		   'not null' => FALSE,
+		),
+		'error_text' => array(
+		   'description' => 'Message returned due to error condition',
+		   'type' => 'varchar',
+		   'length' => 512,
+		   'not null' => FALSE,
+		),
+	 ),	
+	 'primary key' => array('ldid'),
+	 'indexes' => array(
+      	 'sboc_link_dsitribution_attendee_id' => array('attendee_id'), 
+      	 'sboc_link_dsitribution_event_id' => array('event_id'),
+	  	 'sboc_link_dsitribution_order_id' => array('order_id'),
+	  	 'sboc_link_dsitribution_email_address' => array('email_address'),
+     ), 
+  );
+  
+  $schema['sboc_links_per_category'] = array(
+      'description' => 'Stores links per event, per category',
+      'fields' => array(
+      	 'lpcid' => array(
+		    'description' => 'The primary identifier for records in this table.', 
+            'type' => 'serial', 
+            'unsigned' => TRUE, 
+            'not null' => TRUE,
+		 ),
+		 'event_id' => array(
+		    'description' => 'The primary identifier for an Eventbrite event.', 
+            'type' => 'varchar', 
+            'length' => 20, 
+            'not null' => TRUE,
+		 ),	
+		 'category' => array(
+		   'description' => 'Category attendee will compete in',            
+           'type' => 'varchar', 
+           'length' => 2,      		   
+           'not null' => TRUE,
+		 ),
+		 'url' => array(
+		   'description' => 'Url for download',
+		   'type' => 'varchar',
+		   'length' => 255,
+		   'not null' => FALSE,
+		 ),	
+		 'comment' => array(
+		   'description' => 'Comments',
+		   'type' => 'varchar',
+		   'length' => 512,
+		   'not null' => FALSE,
+		 ),
+      ),
+      'primary key' => array('lpcid'),
+      'indexes' => array(
+          'sboc_links_per_category_event_id' => array('event_id'),      	  
+          'sboc_links_per_category_category' => array('category'),      	  
+      ),
+  );
+
+  return $schema;
+} 
