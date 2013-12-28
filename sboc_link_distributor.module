@@ -4,6 +4,9 @@
  * sboc_link_distributor.module - manage url distribution
  */
  
+ define('SBOC_LINK_DISTRIBUTOR_MODULE_NAME', 'sboc_link_distributor');
+ define('SBOC_LINK_DISTRIBUTOR_LINK_NOT_FOUND_MSG', 'We could not match the Order Number entered. Please try again.');
+ 
  /**
  * Implementation of hook_help
  */
@@ -12,7 +15,7 @@
     $output = '';
 	switch($path){
 		case 'admin/help#sboc_link_distributor':
-		  $output = '<p>'. t('Displays a form which accepts an order id. User entered data is matched against entries in the database and an approproate link or links displayed.').'</p>';
+		  $output = '<p>'. t('Displays a form which accepts an order number. User entered data is matched against entries in the database and an approproate link or links displayed.').'</p>';
 		  break;		
 		default:
           break;		
@@ -77,6 +80,18 @@
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('_sboc_link_distributor_link_edit'),
 		'access arguments' => array('administer sboc_link_distributor'),
+// 		'file' => 'sboc_link_distributor_admin_form.inc',
+// 	    'file path' => drupal_get_path('module', 'sboc_link_distributor'). '/includes',	
+// 		'weight' => 20,
+	);
+	
+	$items['sboc_link_distributor/link_request_form'] = array(
+		'title' => 'Request link',
+		'type' =>  MENU_NORMAL_ITEM | MENU_CALLBACK,
+		'description' => 'Request Download Link',		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_sboc_link_distributor_link_request'),
+		'access arguments' => array('access sboc_link_distributor form'),
 // 		'file' => 'sboc_link_distributor_admin_form.inc',
 // 	    'file path' => drupal_get_path('module', 'sboc_link_distributor'). '/includes',	
 // 		'weight' => 20,
@@ -175,7 +190,7 @@
 	   '#required' => TRUE,
 	);
 	
-	$form['sboc_link_distributor_link_add']['link'] = array(
+	$form['sboc_link_distributor_link_add']['url'] = array(
 	   '#type' => 'textfield',
 	   '#title' => t('Link Url:'),
 	   '#default_value' => '',
@@ -225,8 +240,8 @@
 				->fields(array(
   					'event_id' => $form_state['values']['event_id'],
   					'category' => $form_state['values']['category'],
-  					'url' => $form_state['values']['link'],
-//   					'comment' => $form_state['values']['link'],
+  					'url' => $form_state['values']['url'],
+//   					'comment' => $form_state['values']['comment'],
 				))
 	->execute();
 	
@@ -307,7 +322,7 @@
     		'event_id' => $form_state['values']['event_id'],
   			'category' => $form_state['values']['category'],
   			'url' => $form_state['values']['url'],
-//   		'comment' => $form_state['values']['link'],
+//   		'comment' => $form_state['values']['comment'],
   	))
   	->condition('lpcid', (int)$form_state['values']['lpcid'], '=')
   	->execute();
@@ -320,6 +335,127 @@
  {
  	unset($form_state['storage']);
   	$form_state['redirect'] = 'admin/config/system/sboc_link_distributor/main';
+ }
+ 
+ function _sboc_link_distributor_link_request($form, &$form_state)
+ {
+ 	$form = array();
+     
+    $form['sboc_link_distributor_link_request'] = array(
+	   '#type' => 'fieldset',
+	   '#title' => t('To retrieve download links corresponding to your order, enter the Order Number you received from Eventbrite upon registration.'),
+	); 
+	
+	$form['sboc_link_distributor_link_request']['order_id'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Order Number:'),
+	   '#default_value' => '',
+	   '#size' => 50,
+  	   '#maxlength' => 100, 
+	   '#required' => TRUE,
+	);
+	
+	$form['sboc_link_distributor_link_request']['save'] = array(
+	   '#type' => 'submit',
+	   '#value' => t('Submit'),	
+	   '#submit' => array('_sboc_link_distributor_link_submit_request',),	
+	);
+	
+	$form['sboc_link_distributor_link_request']['cancel'] = array(
+	   '#type' => 'submit',
+	   '#limit_validation_errors' => array(),
+	   '#submit' => array('_sboc_link_distributor_link_cancel_request'),
+	   '#value' => t('Cancel'),	
+	);
+	
+	$form['sboc_link_distributor_link_request']["separator"] = array(			
+  		'#markup' => '<div style="margin-bottom: 10px;"></div>',
+	);
+	
+	if (isset($_SESSION['request']['links'])){
+	
+		$form['sboc_link_distributor_link_action'] = array(
+	   		'#type' => 'fieldset',
+	   		'#title' => t('Available Links:'),
+		);
+		
+		for($ctr = 0; $ctr < count($_SESSION['request']['links']); $ctr++){
+		    $link = $_SESSION['request']['links'][$ctr];
+			$form['sboc_link_distributor_link_action']["links_$ctr"] = array(			
+  				 '#markup' => format_string('<a href="!url" title="">Download: !link_name</a>', 
+  					array('!url' =>  $link->Url, '!link_name' =>  $link->CategoryName,)),
+  				 '#prefix' => '<div class="download-link" style="font-size: 18px;">',
+  				 '#suffix' => '</div>',	
+			);			
+		}
+		
+		if (!count($_SESSION['request']['links'])){
+			$form['sboc_link_distributor_link_action']["error"] = array(			
+  		'#markup' => '<div style="color: #FF0000;">'. SBOC_LINK_DISTRIBUTOR_LINK_NOT_FOUND_MSG .'</div>',
+			);
+		}
+		
+		unset($_SESSION['request']);
+	}
+// 	else{
+// 		$form['sboc_link_distributor_link_action']["error"] = array(			
+//   		'#markup' => '<div style="color: #FF0000;">'. SBOC_LINK_DISTRIBUTOR_LINK_NOT_FOUND_MSG .'</div>',
+// 			);
+// 	}
+		
+ 	return $form;
+ }
+ 
+ function _sboc_link_distributor_link_submit_request($form, &$form_state)
+ { 
+ 	try{	
+ 	    $orders = db_select('eventbrite_sboc_attendees', 'ea')
+ 			->fields('ea')
+  			->condition('order_id', check_plain($form_state['values']['order_id']), '=')
+  			->execute();
+  		$_SESSION['request']['categories'] = array();	
+  		$log = db_insert('sboc_link_distribution')
+  			->fields(array('event_id', 'attendee_id', 'order_id', 'email_address', 'category', 'url', 'create_date'));	
+  		$log_rows = array();	
+  		while ($row = $orders->fetchAssoc()){
+  		   $_SESSION['request']['event_id'] = check_plain($row['event_id']);
+  		   $_SESSION['request']['categories'][] = check_plain($row['category']); 
+  		   $log_rows[] = array('event_id' => $row['event_id'], 'attendee_id' => $row['attendee_id'], 'order_id' => $row['order_id'], 'email_address' => $row['email_address'], 'category' => $row['category'], 'url' => NULL, 'create_date' => date('Y-m-d H:i:s'),);		   
+  		}
+  		$_SESSION['request']['links'] = array();
+  		$event_id = (!empty($_SESSION['request']['event_id']) ? $_SESSION['request']['event_id'] : '0');
+  		$categories = (!empty($_SESSION['request']['categories']) ? $_SESSION['request']['categories'] : array('0'));
+  		$links =  db_select('sboc_links_per_category', 's')
+ 			->fields('s')
+  			->condition('event_id', check_plain($event_id), '=')
+  			->condition('category', $categories, 'IN')
+  			->execute();
+  		$ctr = 0;	  		
+  		while ($row = $links->fetchAssoc()){
+ 			$link_info = new StdClass();
+			$_SESSION['request']['links'][] = $link_info;
+			$link_info->Category = $row['category'];
+			$link_info->Url = $row['url'];
+			$link_info->CategoryName = _sboc_link_distributor_categories($row['category']);
+			$link_info->link = url($link_info->Url, array('absolute' => TRUE, 'external' => TRUE,));
+			$log_rows[$ctr]['url'] = $link_info->Url;
+			$log->values($log_rows[$ctr++]);			
+  		}	
+  		if ($ctr > 0){
+  			$log->execute();
+  		}
+//   		dpm($_SESSION['request']);	
+  	}catch(Exception $e){
+	   watchdog(SBOC_LINK_DISTRIBUTOR_MODULE_NAME, t($e->getMessage()), array(), WATCHDOG_ERROR);
+	}
+	
+ 	return $form;
+ }
+ 
+ function _sboc_link_distributor_link_cancel_request($form, &$form_state)
+ {
+ 	unset($form_state['storage']);
+  	$form_state['redirect'] = '/';
  }
  
   // -------------------------------------bof: hooks ---------------------------------------------- //
