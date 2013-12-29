@@ -6,6 +6,7 @@
  
  define('SBOC_LINK_DISTRIBUTOR_MODULE_NAME', 'sboc_link_distributor');
  define('SBOC_LINK_DISTRIBUTOR_LINK_NOT_FOUND_MSG', 'We could not match the Order Number entered. Please try again.');
+ define('SBOC_LINK_DISTRIBUTOR_LINK_NO_LINKS', 'Your link(s) will appear here.');
  
  /**
  * Implementation of hook_help
@@ -127,7 +128,7 @@
 	   			'data' => array(
 	   				'#type' => 'link',
 	   				'#title' => $category['category'],
-	   				'#href' =>  $category['lpcid'],	   				
+	   				'#href' =>  'admin/config/system/sboc_link_distributor/category/' . $category['lpcid'] . '/edit',	   				
 	   			),
 	   		),
 	   		'event_id' => check_plain($category['event_id']),
@@ -396,12 +397,11 @@
 		}
 		
 		unset($_SESSION['request']);
-	}
-// 	else{
-// 		$form['sboc_link_distributor_link_action']["error"] = array(			
-//   		'#markup' => '<div style="color: #FF0000;">'. SBOC_LINK_DISTRIBUTOR_LINK_NOT_FOUND_MSG .'</div>',
-// 			);
-// 	}
+	}else{
+ 		$form['sboc_link_distributor_link_action']["no_links"] = array(			
+   		'#markup' => '<div style="color: #000;">'. SBOC_LINK_DISTRIBUTOR_LINK_NO_LINKS .'</div>',
+ 			);
+ 	}
 		
  	return $form;
  }
